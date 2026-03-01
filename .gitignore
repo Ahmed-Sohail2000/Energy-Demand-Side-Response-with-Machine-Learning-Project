@@ -4,7 +4,6 @@ venv/
 .venv/
 .env
 .env.local
-data/
 models/
 *.pkl
 .DS_Store
