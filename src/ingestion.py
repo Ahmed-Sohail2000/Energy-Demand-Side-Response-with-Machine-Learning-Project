@@ -38,13 +38,21 @@ def run():
         }
     )
 
+
+    # check the missing values
+    print(f" Missing values in df: {df.isnull().sum()}")
+
+    # check the data length
+    print(f" Length of df: {len(df)}")
+
     # Parse timestamp as datetime UTC and set as index so we can resample later; sort ascending
     df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
     df = df.set_index("timestamp").sort_index()
 
-    # Drop rows where load_kw or price_eur_mwh is null — we need both for DSR
-    df = df.dropna(subset=["load_kw", "price_eur_mwh"])
-    print(f"  Row count after cleaning: {len(df)}.")
+    # Fill missing load_kw using forward-fill then back-fill, then drop any remaining missing prices
+    df["load_kw"] = df["load_kw"].ffill().bfill()
+    df = df.dropna(subset=["price_eur_mwh"])
+    print(f"  Missing values after fill: {df.isnull().sum().sum()}")
 
     # -------------------------------------------------------------------------
     # STEP 2 — Resample hourly → 15-minute intervals
