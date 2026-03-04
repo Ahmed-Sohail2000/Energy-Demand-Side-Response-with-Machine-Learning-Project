@@ -7,7 +7,7 @@ Built as a technical case study for Cledion. Live app: https://demandsiderespons
 ---
 
 ## Architecture Overview
-
+```
 data/                  # Raw input datasets (load, prices)
 src/
   ingestion.py         # Load, clean and resample data to 30-min intervals
@@ -20,6 +20,7 @@ app/
 tests/
   test_activation.py   # 10 unit tests
   test_revenue.py      # 11 unit tests
+```
 
 ---
 
