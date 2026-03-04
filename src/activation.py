@@ -15,10 +15,12 @@ from sklearn.model_selection import TimeSeriesSplit
 from src.features import FEATURE_COLS, run as features_run
 
 # -----------------------------------------------------------------------------
-# Configuration
+# Configuration — paths and thresholds
 # -----------------------------------------------------------------------------
 PROCESSED_PARQUET = "data/processed/processed_data.parquet"
-# Final score >= this value → activate DSR for that interval (1), else 0
+# Threshold for the combined score to trigger DSR activation.
+# Intervals with score_final >= 0.40 are activated (1), all others are 0.
+# Lowering this value activates more intervals but increases false positives.
 ACTIVATE_THRESH = 0.40
 
 
@@ -44,6 +46,9 @@ def _add_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.sort_values("timestamp").reset_index(drop=True)
 
+    # All lags and rolling windows use shift(1) or .shift(1) after rolling
+    # to ensure we only use PAST data — never the current interval's value.
+    # This prevents data leakage when training the ML model.
     # Price features (lags and rolling = past only)
     df["price_lag_1"] = df["price_eur_mwh"].shift(1)
     df["price_lag_4"] = df["price_eur_mwh"].shift(4)
@@ -108,7 +113,10 @@ def ml_score(site_id: str, date: str, df: pd.DataFrame) -> np.ndarray:
         fold_accs.append(model.score(X_val, y_val))
     print(f"  XGBoost CV accuracy: {np.mean(fold_accs):.4f} (+/- {np.std(fold_accs):.4f})")
 
+    
     # ----- 4. Final model: fit on all history except the target day (no leakage) -----
+    # Final fit excludes the target date entirely to prevent any leakage
+    # from the day we are predicting into the training set.
     target_date = pd.to_datetime(date).date()
     mask = full["timestamp"].dt.date != target_date
     model.fit(full[FEATURE_COLS][mask], y[mask.values])
@@ -136,7 +144,11 @@ def run(site_id: str, date: str) -> pd.DataFrame:
     # ----- 3. Add ML score (0–1) from XGBoost -----
     df["score_ml"] = ml_score(site_id, date, df)
 
+    
     # ----- 4. Combine scores and binarize activate -----
+    # Weighted combination: ML score gets 60% weight, rule score gets 40%.
+    # ML is weighted higher because it captures non-linear price patterns.
+    # Adjust weights here if rule-based logic should have more influence.
     df["score_final"] = 0.4 * df["score_rule"] + 0.6 * df["score_ml"]
     df["activate"] = (df["score_final"] >= ACTIVATE_THRESH).astype(int)
 
