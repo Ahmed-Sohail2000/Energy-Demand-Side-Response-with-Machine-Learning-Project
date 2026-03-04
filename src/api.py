@@ -1,9 +1,21 @@
+"""
+FastAPI backend for the DSR Simulation — Cledion case study.
+Exposes endpoints for listing sites, retrieving activation signals,
+and running full revenue simulations for a given site and date.
+
+Run with:
+    uvicorn src.api:app --reload
+Or directly:
+    python src/api.py
+"""
+
 # pip install fastapi uvicorn
 import sys
 import os
 import pandas as pd
 from datetime import datetime
 
+# Allow imports from the project root when running this file directly
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, HTTPException, Query
@@ -28,11 +40,13 @@ def root():
 
 @app.get("/health")
 def health():
+    """Simple liveness check — returns ok if the server is running."""
     return {"status": "ok", "version": "1.0.0"}
 
 
 @app.get("/sites")
 def sites():
+    """Return a sorted list of all site IDs available in the processed dataset."""
     try:
         df = pd.read_parquet("data/processed/processed_data.parquet")
     except FileNotFoundError:
@@ -45,6 +59,7 @@ def signal(
     site_id: str = Query(...),
     date: str = Query(...),
 ):
+    # FastAPI does not auto-validate plain string date params — validate manually
     try:
         datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
@@ -62,6 +77,7 @@ def simulate_endpoint(
     site_id: str = Query(...),
     date: str = Query(...),
 ):
+    # FastAPI does not auto-validate plain string date params — validate manually
     try:
         datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
@@ -85,6 +101,7 @@ if __name__ == "__main__":
     import uvicorn
     import socket
 
+    # Find an available port starting from 8000 — avoids crashes if the default port is already in use
     def find_free_port(start_port: int = 8000) -> int:
         port = start_port
         while port < 9000:
